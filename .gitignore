@@ -1,0 +1,10 @@
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+config.ini
+image.png
