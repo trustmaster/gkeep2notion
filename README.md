@@ -8,7 +8,7 @@ Supports exporting:
 
 - Notes
 - TODO lists
-- Images and audio
+- Images and audio (_unsupported in recent Notion API versions, stay tuned for updates_)
 - Categorization via labels
 
 ## Installation
