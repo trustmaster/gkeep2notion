@@ -1,6 +1,7 @@
 #!/usr/local/bin/python3
 from argparse import ArgumentParser
 from configparser import ConfigParser
+from enum import Enum
 import os
 import getpass
 import re
@@ -8,8 +9,130 @@ import keyring
 import urllib.request
 
 from gkeepapi import Keep, node
-from notion.block import AudioBlock, BulletedListBlock, ImageBlock, NumberedListBlock, PageBlock, QuoteBlock, TextBlock, TodoBlock
-from notion.client import NotionClient
+from notion_client import Client
+
+
+class BlockType(str, Enum):
+    """Notion Block Type"""
+    Paragraph = 'paragraph'
+    H1 = "heading_1"
+    H2 = "heading_2"
+    H3 = "heading_3"
+    BulletedListItem = "bulleted_list_item"
+    NumberedListItem = "numbered_list_item"
+    ToDo = "to_do"
+    Toggle = "toggle"
+    ChildPage = "child_page"
+    ChildDatabase = "child_database"
+    Embed = "embed"
+    Image = "image"
+    Video = "video"
+    File = "file"
+    PDF = "pdf"
+    Bookmark = "bookmark"
+    Callout = "callout"
+    Quote = "quote"
+    Equation = "equation"
+    Divider = "divider"
+    TableOfContents = "table_of_contents"
+    Column = "column"
+    ColumnList = "column_list"
+    LinkPreview = "link_preview"
+    SyncedBlock = "synced_block"
+    Template = "template"
+    LinkToPage = "link_to_page"
+    Table = "table"
+    TableRow = "table_row"
+    Unsupported = "unsupported"
+
+
+class Page:
+    """Notion Page model"""
+
+    def __init__(self, title: str, parent_id: str):
+        self._id = ''
+        self._title = title
+        self._parent_id = parent_id
+        self._children = []
+
+    def render(self) -> dict:
+        return {
+            "properties": {
+                "title": [{"text": {"content": self._title}}]
+            },
+            "parent": {
+                "type": "page_id",
+                "page_id": self._parent_id
+            },
+            "children": self._children
+        }
+
+    @property
+    def parent(self) -> dict:
+        return {
+            "type": "page_id",
+            "page_id": self._parent_id
+        }
+
+    @property
+    def properties(self) -> dict:
+        return {
+            "title": [{"text": {"content": self._title}}]
+        }
+
+    @property
+    def children(self) -> dict:
+        return self._children
+
+    @property
+    def title(self) -> str:
+        return self._title
+
+    @property
+    def id(self) -> str:
+        return self._id
+
+    @id.setter
+    def id(self, id: str):
+        self._id = id
+
+    def add_text(self, text: str, type: BlockType = BlockType.Paragraph):
+        self._children.append({
+            "object": "block",
+            "type": type,
+            type: {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {"content": text}
+                    }
+                ]
+            }
+        })
+
+    def add_todo(self, text: str, checked: bool):
+        self._children.append({
+            "object": "block",
+            "type": BlockType.ToDo,
+            BlockType.ToDo: {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {"content": text}
+                    }
+                ],
+                "checked": checked
+            }
+        })
+
+
+def create_page(notion: Client, page: Page) -> Page:
+    """Creates a page in Notion and saves page.id"""
+    notion_page = notion.pages.create(parent=page.parent,
+                                      properties=page.properties,
+                                      children=page.children)
+    page.id = notion_page['id']
+    return page
 
 
 class Config:
@@ -71,47 +194,47 @@ def downloadFile(url, path):
 def renderUrls(text: str) -> str:
     return re.sub(r'(https?://[\w\-\.]+\.[a-z]+(/[\w_\.%\-&\?=/#]*)*)', r'[\1](\1)', text, flags=re.MULTILINE)
 
-# Supported block types:
-# - TextBlock
-# - BulletedListBlock: starting with - or *
-# - NumberedListBlock
-# - QuoteBlock: starting with >
-
 
 def parseBlock(p: str) -> dict:
-    if re.match(r'^(\d+)\.', p):
+    """Parses a line from a Keep Note into a Notion block type and text
+
+    Supported block types:
+    - Paragraph
+    - BulletedListItem: starting with - or *
+    - NumberedListItem: starting with a 1. or other number and dot
+    - Quote: starting with >
+    """
+    m = re.match(r'^(\d+)\.\s+(.+)', p)
+    if m:
         return {
-            'type': NumberedListBlock,
-            'title': p,
+            'type': BlockType.NumberedListItem,
+            'text': m.group(2),
         }
     # TODO: support nested lists
     m = re.match(r'^\s*(\*|-)\s+(.+)', p)
     if m:
         return {
-            'type': BulletedListBlock,
-            'title': m.group(2),
+            'type': BlockType.BulletedListItem,
+            'text': m.group(2),
         }
     m = re.match(r'^>\s+(.+)', p)
     if m:
         return {
-            'type': QuoteBlock,
-            'title': m.group(1)
+            'type': BlockType.Quote,
+            'text': m.group(1)
         }
     return {
-        'type': TextBlock,
-        'title': p,
+        'type': BlockType.Paragraph,
+        'text': p,
     }
 
 
-def parsePage(text: str) -> list[dict]:
+def parseTextToPage(text: str, page: Page):
     lines = text.splitlines()
     print(f"Parsing {len(lines)} blocks")
-    return [parseBlock(p) for p in lines]
-
-
-def renderBlocks(page: PageBlock, blocks: list[dict]):
-    for b in blocks:
-        page.children.add_new(b['type'], title=b['title'])
+    for p in lines:
+        block = parseBlock(p)
+        page.add_text(block['text'], block['type'])
 
 
 def getNoteCategories(note: node.TopLevelNode) -> list[str]:
@@ -121,7 +244,7 @@ def getNoteCategories(note: node.TopLevelNode) -> list[str]:
     return categories
 
 
-def importCategories(note: node.TopLevelNode, root: PageBlock, default: str, categories: dict[str, PageBlock]) -> PageBlock:
+def importPageWithCategories(notion: Client, note: node.TopLevelNode, root: Page, categories: dict[str, Page]) -> Page:
     # Extract categories
     rootName = root.title
     cats = getNoteCategories(note)
@@ -135,25 +258,15 @@ def importCategories(note: node.TopLevelNode, root: PageBlock, default: str, cat
         if parentKey in categories:
             parent = categories[parentKey]
         else:
-            parent = root.children.add_new(PageBlock, title=parentName)
+            parent = Page(parentName, root.id)
+            create_page(notion, parent)
             categories[parentKey] = parent
         cats = cats[1:]
-    page: PageBlock = parent.children.add_new(PageBlock, title=note.title)
 
-    # Insert to other categories as alias
-    for catName in cats:
-        catKey = f"{rootName}.{catName}"
-        if catKey in categories:
-            cat = categories[catKey]
-        else:
-            cat = root.children.add_new(PageBlock, title=catName)
-            categories[catKey] = cat
-        cat.children.add_alias(page)
-
-    return page
+    return Page(note.title, parent.id)
 
 
-def parseNote(note: node.TopLevelNode, page: PageBlock, keep: Keep, config: Config):
+def parseNote(note: node.TopLevelNode, page: Page, keep: Keep, config: Config):
     # TODO add background colors (currently unsupported by notion-py)
     # color = str(note.color)[len('ColorValue.'):].lower()
     # if color != 'default':
@@ -162,37 +275,47 @@ def parseNote(note: node.TopLevelNode, page: PageBlock, keep: Keep, config: Conf
     if config.import_media:
         # Images
         if len(note.images) > 0:
-            for blob in note.images:
-                print('Importing image ', blob.text)
-                url = keep.getMediaLink(blob)
-                downloadFile(url, 'image.png')
-                img: ImageBlock = page.children.add_new(
-                    ImageBlock, title=blob.text)
-                img.upload_file('image.png')
+            print('Uploading images is unsupported by Notion API :(')
+            # for blob in note.images:
+            #     print('Importing image ', blob.text)
+            #     url = keep.getMediaLink(blob)
+            #     downloadFile(url, 'image.png')
+            #     img: ImageBlock = page.children.add_new(
+            #         ImageBlock, title=blob.text)
+            #     img.upload_file('image.png')
 
         # Audio
         if len(note.audio) > 0:
-            for blob in note.audio:
-                print('Importing audio ', blob.text)
-                url = keep.getMediaLink(blob)
-                downloadFile(url, 'audio.mp3')
-                img: AudioBlock = page.children.add_new(
-                    AudioBlock, title=blob.text)
-                img.upload_file('audio.mp3')
+            print('Uploading audio is unsupported by Notion API :(')
+            # for blob in note.audio:
+            #     print('Importing audio ', blob.text)
+            #     url = keep.getMediaLink(blob)
+            #     downloadFile(url, 'audio.mp3')
+            #     img: AudioBlock = page.children.add_new(
+            #         AudioBlock, title=blob.text)
+            #     img.upload_file('audio.mp3')
 
     # Text
     text = note.text
     # Render URLs
     text = renderUrls(text)
     # Render page blocks
-    blocks = parsePage(text)
-    renderBlocks(page, blocks)
+    parseTextToPage(text, page)
 
 
-def parseList(list: node.List, page: PageBlock):
+def parseList(list: node.List, page: Page):
     item: node.ListItem
     for item in list.items:  # type: node.ListItem
-        page.children.add_new(TodoBlock, title=item.text, checked=item.checked)
+        page.add_todo(item.text, item.checked)
+
+
+def url2uuid(url: str) -> str:
+    """Extract UUID part from the notion URL"""
+    m = re.match(r'^https://(www\.)?notion.so/(.+)([0-9a-f]{32})/?$', url)
+    if not m:
+        return ''
+    id = m[3]
+    return f"{id[0:8]}-{id[8:12]}-{id[12:16]}-{id[16:20]}-{id[20:32]}"
 
 
 argparser = ArgumentParser(
@@ -205,18 +328,22 @@ args = argparser.parse_args()
 
 config = get_config()
 
+root_uuid = url2uuid(config.root_url)
+
 keep = Keep()
 login(keep, config.email)
 
 print('Logging into Notion')
-client = NotionClient(token_v2=config.token)
+notion = Client(auth=config.token)
 
-root = client.get_block(config.root_url)
-
-notes = root.children.add_new(PageBlock, title='Notes')
-todos = root.children.add_new(PageBlock, title='TODOs')
+notes = Page('Notes', root_uuid)
+todos = Page('TODOs', root_uuid)
+create_page(notion, notes)
+create_page(notion, todos)
 
 categories = {
+    'Notes': notes,
+    'TODOs': todos
 }
 
 glabels = []
@@ -247,14 +374,13 @@ for gnote in gnotes:
         if not config.import_todos:
             continue
         print(f'Importing TODO #{i}: {gnote.title}')
-        page = importCategories(gnote, todos, 'TODOs', categories)
+        page = importPageWithCategories(notion, gnote, todos, categories)
         parseList(gnote, page)
+        create_page(notion, page)
     else:
         if not config.import_notes:
             continue
         print(f'Importing note #{i}: {gnote.title}')
-        page = importCategories(gnote, notes, 'Notes', categories)
+        page = importPageWithCategories(notion, gnote, notes, categories)
         parseNote(gnote, page, keep, config)
-
-    if i == 12:
-        break
+        create_page(notion, page)

@@ -13,7 +13,7 @@ Supports exporting:
 
 ## Installation
 
-This script requires Python 3.9+, https://github.com/kiwiz/gkeepapi, https://github.com/jamalex/notion-py, and a couple more libraries to run. Install the pre-requisite libraries via [Pip3](https://pypi.org/project/pip/):
+This script requires Python 3.9+, https://github.com/kiwiz/gkeepapi, https://github.com/ramnes/notion-sdk-py, and a couple more libraries to run. Install the pre-requisite libraries via [Pip3](https://pypi.org/project/pip/):
 
 ```
 pip3 install -r requirements.txt
@@ -49,7 +49,7 @@ import_todos=true # Set to false if you don't want to import TODO lists
 import_media=true # Set to false if you don't need to import images and audio
 
 [notion]
-token=Copy it from Notion cookies: token_v2 # See documentation below
+token=Copy it from your Notion integratin # See documentation below
 root_url=https://notion.so/PAGE-ID Create a root url in your Notion # See documentation below
 ```
 
@@ -57,17 +57,21 @@ root_url=https://notion.so/PAGE-ID Create a root url in your Notion # See docume
 
 The importer needs to access your Notion account and it needs to know the root URL in which to import all the Google Keep contents.
 
-To get the access token, you need to copy the value of `token_v2` cookie for https://notion.so website. Example actions for Google Chrome:
+To get a Notion authentication token:
 
-1. Log into your Notion account at https://notion.so
-1. Open Chrome Developer Tools and find _Application -> Cookies -> https://www.notion.so_
-1. Find `token_v2` in the variables list and copy the value. Paste the value to `token` in _config.ini_
+1. Go to your [Notion integrations](https://www.notion.so/my-integrations)
+1. Click _"Create new integration"_
+1. Enter any name, e.g. `gkeep2notion`. As per Integration type, choose _Internal integration_. In the _Capabilities_ make sure this integration can Read, Update, and Insert content.
+1. After creating the integration copy the _"Internal Integration Token"_ value to the `token` in your `config.ini`.
 
 ### Configuring the root_url
 
 This script imports all the content under a certain page in Notion that has to exist already. It is recommended to create a special page for the imported content, and then migrate it to your regular Notion structure from there.
 
-Navigate to your import root in the Notion tree, and choose "Copy link" in the context menu. Paste that link to `root_url` in the _config.ini_.
+1. Create a new page in Notion e.g. _"Google Keep import"_
+1. Click on the _"Share"_ button and search for your integration in the input. Click _"Invite"_ to make this page accessible to the app
+1. Copy the URL of the page in the address bar or use _"Copy link"_ in the context menu of the navigation bar
+1. Paste that link to `root_url` in the _config.ini_.
 
 ## Usage
 
@@ -113,4 +117,4 @@ An example with multiple labels, comma separated:
 
 This tool uses the [unofficial Google Keep API for Python](https://github.com/kiwiz/gkeepapi) by [kiwiz](https://github.com/kiwiz). Google Keep is of course a registered trademark of Google and neither the API nor this script are affiliated with Google, Inc.
 
-Thanks to [jamalex](https://github.com/jamalex) for the [unofficial Notion Python API](https://github.com/jamalex/notion-py). Neither that API nor this script are affiliated with Notion. Notion is a trademark of Notion Labs, Inc.
+Thanks to [ramnes](https://github.com/ramnes) for the [unofficial Notion Python SDK](https://github.com/ramnes/notion-sdk-py). Neither that API nor this script are affiliated with Notion. Notion is a trademark of Notion Labs, Inc.
