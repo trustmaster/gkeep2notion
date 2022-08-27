@@ -46,6 +46,51 @@ class BlockType(str, Enum):
     Unsupported = "unsupported"
 
 
+class RichText:
+    """Notion rich text blocks"""
+    urlRegex = re.compile(
+        r'(https?://[\w\-\.]+\.[a-z]+(?:/[\w_\.%\-&\?=/#]*)*)', flags=re.MULTILINE)
+
+    def __init__(self, text: str):
+        self._chunks = []
+        self._parse(text)
+
+    def _parse(self, text: str):
+        # Split in chunks by URLs
+        chunks = RichText.urlRegex.split(text)
+        for c in chunks:
+            if RichText.urlRegex.fullmatch(c):
+                # Add as URL
+                self.add_chunk(c, c)
+            else:
+                self.add_chunk(c)
+
+    @property
+    def chunks(self) -> list[dict]:
+        return self._chunks
+
+    def add_chunk(self, text: str, url: str = ''):
+        if url != '':
+            self._chunks.append({
+                "type": "text",
+                "text": {
+                    "content": text,
+                    "link": {
+                        "type": "url",
+                        "url": url
+                    }
+                }
+            })
+            return
+
+        self._chunks.append({
+            "type": "text",
+            "text": {
+                    "content": text
+            }
+        })
+
+
 class Page:
     """Notion Page model"""
 
@@ -97,30 +142,22 @@ class Page:
         self._id = id
 
     def add_text(self, text: str, type: BlockType = BlockType.Paragraph):
+        richText = RichText(text)
         self._children.append({
             "object": "block",
             "type": type,
             type: {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {"content": text}
-                    }
-                ]
+                "rich_text": richText.chunks
             }
         })
 
     def add_todo(self, text: str, checked: bool):
+        richText = RichText(text)
         self._children.append({
             "object": "block",
             "type": BlockType.ToDo,
             BlockType.ToDo: {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {"content": text}
-                    }
-                ],
+                "rich_text": richText.chunks,
                 "checked": checked
             }
         })
@@ -189,10 +226,6 @@ def login(keep: Keep, email: str):
 
 def downloadFile(url, path):
     urllib.request.urlretrieve(url, path)
-
-
-def renderUrls(text: str) -> str:
-    return re.sub(r'(https?://[\w\-\.]+\.[a-z]+(/[\w_\.%\-&\?=/#]*)*)', r'[\1](\1)', text, flags=re.MULTILINE)
 
 
 def parseBlock(p: str) -> dict:
@@ -297,8 +330,6 @@ def parseNote(note: node.TopLevelNode, page: Page, keep: Keep, config: Config):
 
     # Text
     text = note.text
-    # Render URLs
-    text = renderUrls(text)
     # Render page blocks
     parseTextToPage(text, page)
 
