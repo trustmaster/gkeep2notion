@@ -27,11 +27,31 @@ chmod +x gkeep2notion.py
 
 ### Preventing "Authentication failed" on some systems
 
-On some systems the authentication fails even with valid credentials. This may happen because of two reasons: either Google issues a CAPTCHA for your IP address, or SSL certificate validation fails.
+On some systems the authentication fails even with valid credentials. This may happen because of three reasons:
+1. You have enabled 2FA on your account
+2. Google issues a CAPTCHA for your IP address
+3. SSL certificate validation fails.
 
-To fix the CAPTCHA problem, try using the [Unlock CAPTCHA link](https://accounts.google.com/DisplayUnlockCaptcha) before retrying login.
 
-To try fixing the SSL problem, revert to an older version of the following library:
+**To fix the 2FA problem:**
+
+You need to create an app specific password for the script.
+
+1. Go to https://myaccount.google.com/apppasswords
+2. Login to your account
+3. Under the `Select the app and device you want to generate the app password for.` section:
+    1. Select `Other(Custom name)` from the `Select app` dropdown
+    2. Enter some name like `gkeep2notion` and click on `Generate` button
+    3. Copy password from the popup and click Done
+4. Use this copied password in your terminal when script prompts for password
+
+**To fix the CAPTCHA problem:**
+
+Try using the [Unlock CAPTCHA link](https://accounts.google.com/DisplayUnlockCaptcha) before retrying login.
+
+**To try fixing the SSL problem:***
+
+Revert to an older version of the following library:
 
 ```
 pip3 install requests==2.23.0
