@@ -266,7 +266,7 @@ def parseTextToPage(text: str, page: Page):
     lines = text.splitlines()
     lines.insert(len(lines), '')
     last_block = None
-
+    print(f"Parsing {len(lines)} blocks")
     for x in range(0, len(lines)):
         p = lines[x]
         block = parseBlock(p)
