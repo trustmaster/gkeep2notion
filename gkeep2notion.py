@@ -264,10 +264,20 @@ def parseBlock(p: str) -> dict:
 
 def parseTextToPage(text: str, page: Page):
     lines = text.splitlines()
-    print(f"Parsing {len(lines)} blocks")
-    for p in lines:
+    lines.insert(len(lines), '')
+    last_block = None
+
+    for x in range(0, len(lines)):
+        p = lines[x]
         block = parseBlock(p)
-        page.add_text(block['text'], block['type'])
+        if last_block:
+            if last_block['type'] == block['type'] and len(last_block['text']) + len(block['text']) < 2000:
+                last_block['text'] += "\n" + block['text']
+                if x < len(lines) - 1:
+                    continue
+            page.add_text(last_block['text'], last_block['type'])
+        last_block = block
+
 
 
 def getNoteCategories(note: node.TopLevelNode) -> list[str]:
