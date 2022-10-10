@@ -86,7 +86,7 @@ class RichText:
         self._chunks.append({
             "type": "text",
             "text": {
-                    "content": text
+                "content": text
             }
         })
 
@@ -271,7 +271,8 @@ def parseTextToPage(text: str, page: Page):
         p = lines[x]
         block = parseBlock(p)
         if last_block:
-            if last_block['type'] == block['type'] and len(last_block['text']) + len(block['text']) < 2000:
+            if last_block['type'] == 'text' and last_block['type'] == block['type'] and len(last_block['text']) + len(
+                    block['text']) < 2000:
                 last_block['text'] += "\n" + block['text']
                 if x < len(lines) - 1:
                     continue
