@@ -180,6 +180,7 @@ class Config:
         self.import_media = ini['gkeep']['import_media'].lower() == 'true'
         self.token = ini['notion']['token']
         self.root_url = ini['notion']['root_url']
+        self.merge_paragraphs = ini['notion']['merge_paragraphs']
 
 
 def get_config(path='config.ini') -> Config:
