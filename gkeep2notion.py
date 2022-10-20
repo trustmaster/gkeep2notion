@@ -262,7 +262,7 @@ def parseBlock(p: str) -> dict:
     }
 
 
-def parseTextToPage(text: str, page: Page):
+def parseTextToPage(text: str, page: Page, config: Config):
     lines = text.splitlines()
     lines.insert(len(lines), '')
     last_block = None
@@ -270,9 +270,12 @@ def parseTextToPage(text: str, page: Page):
     for x in range(0, len(lines)):
         p = lines[x]
         block = parseBlock(p)
+        if not config.merge_paragraphs:
+            page.add_text(block['text'], block['type'])
+            continue
         if last_block:
-            if last_block['type'] == 'text' and last_block['type'] == block['type'] and len(last_block['text']) + len(
-                    block['text']) < 2000:
+            if last_block['type'] == BlockType.Paragraph and last_block['type'] == block['type'] and len(
+                    last_block['text']) + len(block['text']) < 2000:
                 last_block['text'] += "\n" + block['text']
                 if x < len(lines) - 1:
                     continue
@@ -342,7 +345,7 @@ def parseNote(note: node.TopLevelNode, page: Page, keep: Keep, config: Config):
     # Text
     text = note.text
     # Render page blocks
-    parseTextToPage(text, page)
+    parseTextToPage(text, page, config)
 
 
 def parseList(list: node.List, page: Page):
