@@ -80,18 +80,19 @@ The importer needs to access your Notion account and it needs to know the root U
 To get a Notion authentication token:
 
 1. Go to your [Notion integrations](https://www.notion.so/my-integrations)
-1. Click _"Create new integration"_
-1. Enter any name, e.g. `gkeep2notion`. As per Integration type, choose _Internal integration_. In the _Capabilities_ make sure this integration can Read, Update, and Insert content.
-1. After creating the integration copy the _"Internal Integration Token"_ value to the `token` in your `config.ini`.
+2. Click _"Create new integration"_
+3. Enter any name, e.g. `gkeep2notion`. As per Integration type, choose _Internal integration_. In the _Capabilities_ make sure this integration can Read, Update, and Insert content.
+4. After creating the integration copy the _"Internal Integration Token"_ value to the `token` in your `config.ini`.
 
 ### Configuring the root_url
 
 This script imports all the content under a certain page in Notion that has to exist already. It is recommended to create a special page for the imported content, and then migrate it to your regular Notion structure from there.
 
 1. Create a new page in Notion e.g. _"Google Keep import"_
-1. Click on the _"Share"_ button and search for your integration in the input. Click _"Invite"_ to make this page accessible to the app
-1. Copy the URL of the page in the address bar or use _"Copy link"_ in the context menu of the navigation bar
-1. Paste that link to `root_url` in the _config.ini_.
+2. Click on `•••` button on top right of the page and select _"Add Connections"_ (at the bottom) from the menu.
+3. Search for your integration name and select it. You should press _"Confirm"_ on the dialog that will appear. This will make the page accessible to your integration.
+4. Copy the URL of the page in the address bar or use _"Copy link"_ in the context menu of the navigation bar
+5. Paste that link to `root_url` in the _config.ini_.
 
 ## Usage
 
