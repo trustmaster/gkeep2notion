@@ -218,7 +218,9 @@ def login(keep: Keep, email: str):
         print('Authorization, this may take a while...')
         try:
             keep.resume(email, token)
-        except:
+        except Exception as ex:
+            print('Token expired, logging in again')
+            print(ex)
             authenticate(keep, email)
     else:
         authenticate(keep, email)
@@ -361,10 +363,6 @@ config = get_config()
 
 root_uuid = url2uuid(config.root_url)
 
-print(config.root_url, root_uuid)
-
-quit()
-
 keep = Keep()
 login(keep, config.email)
 
@@ -384,10 +382,10 @@ categories = {
 glabels = []
 if args.labels:
     labels = args.labels.split(',')
-    labels = [l.strip() for l in labels]
+    labels = [label.strip() for label in labels]
     labels = list(filter(lambda l: l != '', labels))
-    for l in labels:
-        glabel = keep.findLabel(l)
+    for label in labels:
+        glabel = keep.findLabel(label)
         glabels.append(glabel)
 
 query = ''
