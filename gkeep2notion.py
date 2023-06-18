@@ -342,7 +342,7 @@ def parseList(list: node.List, page: Page):
 
 def url2uuid(url: str) -> str:
     """Extract UUID part from the notion URL"""
-    m = re.match(r'^https://(www\.)?notion.so/(.+)([0-9a-f]{32})/?$', url)
+    m = re.match(r'^https://(www\.)?notion.so/(.+)([0-9a-f]{32})', url)
     if not m:
         return ''
     id = m[3]
@@ -360,6 +360,10 @@ args = argparser.parse_args()
 config = get_config()
 
 root_uuid = url2uuid(config.root_url)
+
+print(config.root_url, root_uuid)
+
+quit()
 
 keep = Keep()
 login(keep, config.email)
