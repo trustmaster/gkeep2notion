@@ -10,6 +10,7 @@ import urllib.request
 
 from gkeepapi import Keep, node
 from notion_client import Client
+import time
 
 
 class BlockType(str, Enum):
@@ -163,8 +164,28 @@ class Page:
         })
 
 
+# Throttle class implements request throttling with a given rate limit in requests per second.
+class Throttle:
+    def __init__(self, rate_limit: int):
+        self.rate_limit = rate_limit
+        self.interval = 1 / self.rate_limit
+        self.last_call = 0
+
+    def wait(self):
+        now = time.time()
+        elapsed = now - self.last_call
+        if self.last_call > 0 and elapsed < self.interval:
+            time.sleep(self.interval - elapsed)
+        self.last_call = time.time()
+
+
+# Notion accepts up to 3 requests per second
+throttle = Throttle(3)
+
+
 def create_page(notion: Client, page: Page) -> Page:
     """Creates a page in Notion and saves page.id"""
+    throttle.wait()
     notion_page = notion.pages.create(parent=page.parent,
                                       properties=page.properties,
                                       children=page.children)
