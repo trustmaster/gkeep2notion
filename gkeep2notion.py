@@ -187,8 +187,11 @@ def create_page(notion: Client, page: Page) -> Page:
     """Creates a page in Notion and saves page.id"""
     throttle.wait()
     notion_page = notion.pages.create(parent=page.parent,
-                                      properties=page.properties,
-                                      children=page.children)
+                                      properties=page.properties)
+    for i in range(0, len(page.children), 100):
+        notion.blocks.children.append(
+            notion_page["id"], children=page.children[i : i + 100]
+        )
     page.id = notion_page['id']
     return page
 
