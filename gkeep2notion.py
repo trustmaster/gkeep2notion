@@ -87,7 +87,7 @@ class RichText:
         self._chunks.append({
             "type": "text",
             "text": {
-                    "content": text
+                "content": text
             }
         })
 
@@ -204,6 +204,7 @@ class Config:
         self.import_media = ini['gkeep']['import_media'].lower() == 'true'
         self.token = ini['notion']['token']
         self.root_url = ini['notion']['root_url']
+        self.merge_paragraphs = ini['notion']['merge_paragraphs']
 
 
 def get_config(path='config.ini') -> Config:
@@ -288,12 +289,26 @@ def parseBlock(p: str) -> dict:
     }
 
 
-def parseTextToPage(text: str, page: Page):
+def parseTextToPage(text: str, page: Page, config: Config):
     lines = text.splitlines()
+    lines.insert(len(lines), '')
+    last_block = None
     print(f"Parsing {len(lines)} blocks")
-    for p in lines:
+    for x in range(0, len(lines)):
+        p = lines[x]
         block = parseBlock(p)
-        page.add_text(block['text'], block['type'])
+        if not config.merge_paragraphs:
+            page.add_text(block['text'], block['type'])
+            continue
+        if last_block:
+            if last_block['type'] == BlockType.Paragraph and last_block['type'] == block['type'] and len(
+                    last_block['text']) + len(block['text']) < 2000:
+                last_block['text'] += "\n" + block['text']
+                if x < len(lines) - 1:
+                    continue
+            page.add_text(last_block['text'], last_block['type'])
+        last_block = block
+
 
 
 def getNoteCategories(note: node.TopLevelNode) -> list[str]:
@@ -357,7 +372,7 @@ def parseNote(note: node.TopLevelNode, page: Page, keep: Keep, config: Config):
     # Text
     text = note.text
     # Render page blocks
-    parseTextToPage(text, page)
+    parseTextToPage(text, page, config)
 
 
 def parseList(list: node.List, page: Page):
