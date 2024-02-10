@@ -1,4 +1,5 @@
 #!/usr/local/bin/python3
+from typing import List, Dict
 from argparse import ArgumentParser
 from configparser import ConfigParser
 from enum import Enum
@@ -9,7 +10,7 @@ import keyring
 import urllib.request
 
 from gkeepapi import Keep, node
-from notion_client import Client
+from notion_client import Client, errors
 import time
 
 
@@ -67,7 +68,7 @@ class RichText:
                 self.add_chunk(c)
 
     @property
-    def chunks(self) -> list[dict]:
+    def chunks(self) -> List[Dict]:
         return self._chunks
 
     def add_chunk(self, text: str, url: str = ''):
@@ -101,7 +102,7 @@ class Page:
         self._parent_id = parent_id
         self._children = []
 
-    def render(self) -> dict:
+    def render(self) -> Dict:
         return {
             "properties": {
                 "title": [{"text": {"content": self._title}}]
@@ -114,20 +115,20 @@ class Page:
         }
 
     @property
-    def parent(self) -> dict:
+    def parent(self) -> Dict:
         return {
             "type": "page_id",
             "page_id": self._parent_id
         }
 
     @property
-    def properties(self) -> dict:
+    def properties(self) -> Dict:
         return {
             "title": [{"text": {"content": self._title}}]
         }
 
     @property
-    def children(self) -> dict:
+    def children(self) -> Dict:
         return self._children
 
     @property
@@ -254,7 +255,7 @@ def downloadFile(url, path):
     urllib.request.urlretrieve(url, path)
 
 
-def parseBlock(p: str) -> dict:
+def parseBlock(p: str) -> Dict:
     """Parses a line from a Keep Note into a Notion block type and text
 
     Supported block types:
@@ -296,14 +297,14 @@ def parseTextToPage(text: str, page: Page):
         page.add_text(block['text'], block['type'])
 
 
-def getNoteCategories(note: node.TopLevelNode) -> list[str]:
+def getNoteCategories(note: node.TopLevelNode) -> List[str]:
     categories = []
     for label in note.labels.all():
         categories.append(label.name)
     return categories
 
 
-def importPageWithCategories(notion: Client, note: node.TopLevelNode, root: Page, categories: dict[str, Page]) -> Page:
+def importPageWithCategories(notion: Client, note: node.TopLevelNode, root: Page, categories: Dict[str, Page]) -> Page:
     # Extract categories
     rootName = root.title
     cats = getNoteCategories(note)
@@ -362,8 +363,14 @@ def parseNote(note: node.TopLevelNode, page: Page, keep: Keep, config: Config):
 
 def parseList(list: node.List, page: Page):
     item: node.ListItem
-    for item in list.items:  # type: node.ListItem
-        page.add_todo(item.text, item.checked)
+    for item in list.items:
+        while item.text:
+            # Take the first 1500 characters or less, notion sets max todo length to 2000
+            # so we take 1500 to be safe in case of emojis which take more
+            chunk = item.text[:1500]
+            item.text = item.text[1500:] if len(item.text) > 1500 else ""
+            # Add a new to-do item with the chunk of text
+            page.add_todo(chunk, item.checked)
 
 
 def url2uuid(url: str) -> str:
@@ -425,19 +432,49 @@ else:
     gnotes = keep.all()
 
 i = 0
-for gnote in gnotes:
+max_retries = 3  # Retry mechanism
+retry_delay = 2
+while i < 2056:
+    gnote = gnotes[i]
     i += 1
-    if isinstance(gnote, node.List):
-        if not config.import_todos:
-            continue
-        print(f'Importing TODO #{i}: {gnote.title}')
-        page = importPageWithCategories(notion, gnote, todos, categories)
-        parseList(gnote, page)
-        create_page(notion, page)
-    else:
-        if not config.import_notes:
-            continue
-        print(f'Importing note #{i}: {gnote.title}')
-        page = importPageWithCategories(notion, gnote, notes, categories)
-        parseNote(gnote, page, keep, config)
-        create_page(notion, page)
+    try:
+        if isinstance(gnote, node.List):
+            if not config.import_todos:
+                continue
+            print(f'Importing TODO #{i}: {gnote.title}')
+            page = importPageWithCategories(notion, gnote, todos, categories)
+            parseList(gnote, page)
+            create_page(notion, page)
+        else:
+            if not config.import_notes:
+                continue
+            print(f'Importing note #{i}: {gnote.title}')
+            page = importPageWithCategories(notion, gnote, notes, categories)
+            parseNote(gnote, page, keep, config)
+            create_page(notion, page)
+    except errors.APIResponseError as e:
+        if e.code == 400:
+            retries = 0
+            while retries < max_retries:
+                print(f"Retrying request after {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                try:
+                    # Retry the request
+                    if isinstance(gnote, node.List):
+                        page = importPageWithCategories(notion, gnote, todos, categories)
+                        parseList(gnote, page)
+                        create_page(notion, page)
+                    else:
+                        page = importPageWithCategories(notion, gnote, notes, categories)
+                        parseNote(gnote, page, keep, config)
+                        create_page(notion, page)
+                    break  # Exit the retry loop if successful
+                except errors.APIResponseError as e:
+                    if e.code == 400:
+                        retries += 1
+                    else:
+                        raise  # If the error is not a 400, raise it immediately
+            else:
+                raise  # Raise the error if maximum retries are exceeded
+        else:
+            raise  # If the error is not a 400, raise it immediately
