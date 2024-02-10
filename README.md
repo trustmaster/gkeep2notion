@@ -27,6 +27,21 @@ chmod +x gkeep2notion.py
 
 ### Preventing "Authentication failed" on some systems
 
+____
+#### Running inside of a Docker Container
+In order to use the `gkeepapi` dependency, you'll need to run it inside of a docker container that is compatible with it. Otherwise you'll most likely run into an "Authentication failed" error.
+
+1. Build the Docker Image
+```
+docker build -t gkeep2notion_image .
+```
+2. Run the Docker Container
+```
+docker run -it --name gkeep2notion_container gkeep2notion_image /bin/bash
+```
+3. Now you should be inside the container and the rest of the guide should work
+____
+
 On some systems the authentication fails even with valid credentials. This may happen because of three reasons:
 1. You have enabled 2FA on your account
 2. Google issues a CAPTCHA for your IP address
