@@ -434,7 +434,7 @@ else:
 i = 0
 max_retries = 3  # Retry mechanism
 retry_delay = 2
-while i < 2056:
+while i < len(gnotes):
     gnote = gnotes[i]
     i += 1
     try:
